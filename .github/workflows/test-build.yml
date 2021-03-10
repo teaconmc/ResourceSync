@@ -16,6 +16,6 @@ jobs:
             ~/.gradle/caches
             **/.gradle
             !**/.gradle/libs
-        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
       - name: Build
         run: gradle build --stacktrace
