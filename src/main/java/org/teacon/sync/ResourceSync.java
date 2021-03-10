@@ -98,6 +98,7 @@ public class ResourceSync {
             try {
                 Setup.downloadTask.join();
             } catch (Exception e) {
+                LOGGER.warn(PACK_FINDER_MARKER, "Uncaught occured while trying to fetch resource pack. ResourceSync will not try load any resource pack.", e);
                 return;
             }
             if (this.searchTarget.exists() && this.searchTarget.isFile()) {
