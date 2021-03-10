@@ -102,8 +102,8 @@ public class ResourceSync {
                 return;
             }
             if (this.searchTarget.exists() && this.searchTarget.isFile()) {
-                final ResourcePackInfo packInfo = ResourcePackInfo.create("ResourceSync", true,
-                        () -> new FilePack(this.searchTarget), packInfoFactory, ResourcePackInfo.Priority.TOP, IPackNameDecorator.BUILT_IN);
+                final ResourcePackInfo packInfo = ResourcePackInfo.create("ResourceSync", true, () -> new FilePack(this.searchTarget), 
+                        packInfoFactory, ResourcePackInfo.Priority.TOP, IPackNameDecorator.BUILT_IN);
                 packInfoCallback.accept(packInfo);
             } else {
                 LOGGER.warn(PACK_FINDER_MARKER, "The synced resource pack is missing; ResourceSync will not try load any resource pack.");
