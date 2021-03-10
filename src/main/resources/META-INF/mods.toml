@@ -1,0 +1,20 @@
+modLoader="javafml"
+loaderVersion="[36,)"
+license="LGPL-2.1-or-later"
+issueTrackerURL="https://github.com/teaconmc/ResourceSync"
+
+[[mods]]
+modId="resource_sync"
+version="${file.jarVersion}"
+displayName="ResourceSync"
+credits="OpenLoader by Darkhax, for IPackFinder implementation"
+authors="3TUSK"
+description="Preemptively keeps resource pack updated"
+
+[[dependencies.resource_sync]]
+    modId="minecraft"
+    mandatory=true
+    # TODO Does this also run on 1.16, 1.16.1 and 1.16.2?
+    versionRange="[1.16.3,1.17)"
+    ordering="NONE"
+    side="BOTH"
