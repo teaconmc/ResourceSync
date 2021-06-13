@@ -1,7 +1,6 @@
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocation
 
 buildscript {
     repositories {
@@ -80,7 +79,8 @@ shadowJar {
         exclude it.dependency('commons-logging:commons-logging:.*')
         exclude it.dependency('commons-codec:commons-codec:.*')
     }
-    relocate 'org.apache', 'org.teacon.sync.repackage.org.apache'
+    relocate 'org.apache.http.client.cache', 'org.teacon.sync.repackage.org.apache.http.client.cache'
+    relocate 'org.apache.http.impl.client.cache', 'org.teacon.sync.repackage.org.apache.http.impl.client.cache'
 }
 
 jar {
@@ -98,11 +98,14 @@ jar {
     }
 }
 
-// Example configuration to allow publishing using the maven-publish task
-// This is the preferred method to reobfuscate your jar file
-shadowJar.finalizedBy('reobfJar')
-// make build task depend on shadowJar
-assemble.dependsOn('shadowJar')
+reobf {
+    shadowJar {} // Re-obfuscate the shadowed JAR
+}
+
+artifacts {
+    archives shadowJar
+}
+
 // However if you are in a multi-project build, dev time needs unobfed jar files, so you can delay the obfuscation until publishing by doing
 publish.dependsOn('reobfJar')
 
