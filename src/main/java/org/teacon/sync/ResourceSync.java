@@ -105,6 +105,8 @@ public final class ResourceSync {
             }
         });
 
+        private static CompletableFuture<Void> downloadTask = CompletableFuture.completedFuture(null);
+
         public static void setup() {
             ForgeConfigSpec.Builder configSpecBuilder = new ForgeConfigSpec.Builder();
 
@@ -113,18 +115,21 @@ public final class ResourceSync {
             ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, configSpecBuilder.build());
 
             FMLJavaModLoadingContext.get().getModEventBus().addListener(Setup::setupConfig);
-        }
-
-        private static void setupConfig(ModConfig.Loading event) {
             Minecraft.getInstance().getResourcePackRepository().addPackFinder(new SyncedPackFinder(dstPath.get()));
         }
 
-        public static void launch() {
-            CompletableFuture.runAsync(new DownloadTask(storage.get(), dstPath.get())).join();
+        private static void setupConfig(ModConfig.Loading event) {
+            if (event.getConfig().getType() == ModConfig.Type.CLIENT) {
+                downloadTask = CompletableFuture.runAsync(new DownloadTask(storage.get(), dstPath.get()));
+            }
+        }
+
+        public static void waitDownloadTask() {
+            downloadTask.join();
         }
     }
 
-    public static final class SyncedPackFinder implements IPackFinder {
+    static final class SyncedPackFinder implements IPackFinder {
 
         private static final Marker PACK_FINDER_MARKER = MarkerManager.getMarker("PackFinder");
 
@@ -137,7 +142,7 @@ public final class ResourceSync {
         @Override
         public void loadPacks(Consumer<ResourcePackInfo> packInfoCallback, ResourcePackInfo.IFactory packInfoFactory) {
             try {
-                Setup.launch();
+                Setup.waitDownloadTask();
                 packInfoCallback.accept(ResourcePackInfo.create(
                         "resource_sync", true, () -> new ResourcePack(this.dstPath),
                         packInfoFactory, ResourcePackInfo.Priority.TOP, IPackNameDecorator.BUILT_IN));
@@ -192,7 +197,7 @@ public final class ResourceSync {
                     Path tempDst = Files.createTempFile("synced-pack-", ".zip");
                     response.getEntity().writeTo(Files.newOutputStream(tempDst));
                     Files.move(tempDst, this.dstPath, StandardCopyOption.REPLACE_EXISTING);
-                    LOGGER.info(DOWNLOAD_MARKER, "Downloaded resource pack to {} from {}", tempDst, request.getURI());
+                    LOGGER.info(DOWNLOAD_MARKER, "Downloaded resource pack from: {}", request.getURI());
                 } catch (IOException readError) {
                     LOGGER.warn(DOWNLOAD_MARKER, "Error occurred while downloading the resource pack from remote server. Download cannot continue.", readError);
                     throw new CompletionException(readError);
@@ -207,7 +212,7 @@ public final class ResourceSync {
         }
     }
 
-    public static final class SingleFileCacheStorage implements HttpCacheStorage {
+    static final class SingleFileCacheStorage implements HttpCacheStorage {
 
         private final Path path;
         private volatile UUID key;
