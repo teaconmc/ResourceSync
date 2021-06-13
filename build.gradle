@@ -20,7 +20,7 @@ apply plugin: 'maven-publish'
 
 version = '0.1.0'
 group = 'org.teacon'
-archivesBaseName = 'ResourceSync'
+archivesBaseName = 'ResourceSync-Forge-1.16'
 
 // Mojang ships Java 8 to end users, so we target Java 8 at minimum.
 java.toolchain.languageVersion = JavaLanguageVersion.of(8) 
