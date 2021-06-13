@@ -29,7 +29,6 @@ import net.minecraft.resources.IPackFinder;
 import net.minecraft.resources.IPackNameDecorator;
 import net.minecraft.resources.ResourcePackInfo;
 import net.minecraft.util.LazyValue;
-import net.minecraft.util.Util;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.fml.DistExecutor;
@@ -109,7 +108,7 @@ public final class ResourceSync {
             }
         });
 
-        private static CompletableFuture<Void> downloadTask;
+        private static CompletableFuture<Void> downloadTask = CompletableFuture.completedFuture(null);
 
         private static void forceLoad(ForgeConfigSpec configSpec, Path configPath) {
             CommentedFileConfig configData = CommentedFileConfig.builder(configPath)
@@ -131,20 +130,14 @@ public final class ResourceSync {
             packURL = configSpecBuilder.comment(comment).define("packURL", def);
             forceLoad(configSpecBuilder.build(), FMLPaths.CONFIGDIR.get().resolve("resource-sync-client.toml"));
 
-            downloadTask = CompletableFuture.runAsync(new DownloadTask(storage.get(), dstPath.get()));
             Minecraft.getInstance().getResourcePackRepository().addPackFinder(new SyncedPackFinder(dstPath.get()));
         }
 
         public static CompletableFuture<Void> fetchDownloadTask() {
-            if (downloadTask.isCancelled()) {
+            if (downloadTask.isDone()) {
                 downloadTask = CompletableFuture.runAsync(new DownloadTask(storage.get(), dstPath.get()));
-                return downloadTask;
-            } else {
-                CompletableFuture<Void> newTask = Util.make(new CompletableFuture<>(), c -> c.cancel(true));
-                CompletableFuture<Void> oldTask = downloadTask;
-                downloadTask = newTask;
-                return oldTask;
             }
+            return downloadTask;
         }
     }
 
