@@ -135,13 +135,15 @@ public final class ResourceSync {
             Minecraft.getInstance().getResourcePackRepository().addPackFinder(new SyncedPackFinder(dstPath.get()));
         }
 
-        public static void waitDownloadTask() {
+        public static CompletableFuture<Void> fetchDownloadTask() {
             if (downloadTask.isCancelled()) {
                 downloadTask = CompletableFuture.runAsync(new DownloadTask(storage.get(), dstPath.get()));
-                downloadTask.join();
+                return downloadTask;
             } else {
-                downloadTask.join();
-                downloadTask = Util.make(new CompletableFuture<>(), c -> c.cancel(true));
+                CompletableFuture<Void> newTask = Util.make(new CompletableFuture<>(), c -> c.cancel(true));
+                CompletableFuture<Void> oldTask = downloadTask;
+                downloadTask = newTask;
+                return oldTask;
             }
         }
     }
@@ -158,13 +160,22 @@ public final class ResourceSync {
 
         @Override
         public void loadPacks(Consumer<ResourcePackInfo> packInfoCallback, ResourcePackInfo.IFactory packInfoFactory) {
+            // wait for download task
             try {
-                Setup.waitDownloadTask();
-                packInfoCallback.accept(ResourcePackInfo.create(
-                        "resource_sync", true, () -> new ResourcePack(this.dstPath),
-                        packInfoFactory, ResourcePackInfo.Priority.TOP, IPackNameDecorator.BUILT_IN));
-            } catch (Exception e) {
-                LOGGER.warn(PACK_FINDER_MARKER, "An error was thrown when finding the resource pack, ResourceSync will not try to load any resource pack.", e);
+                Setup.fetchDownloadTask().join();
+            } catch (CompletionException e) {
+                LOGGER.warn(PACK_FINDER_MARKER, "An error was thrown when finding the resource pack.", e);
+                LOGGER.warn(PACK_FINDER_MARKER, "ResourceSync will try to load the resource pack locally: {}", this.dstPath);
+            }
+            // load the resource pack
+            ResourcePackInfo packInfo = ResourcePackInfo.create(
+                    "resource_sync", true, () -> new ResourcePack(this.dstPath),
+                    packInfoFactory, ResourcePackInfo.Priority.TOP, IPackNameDecorator.BUILT_IN);
+            // check the resource pack
+            if (packInfo == null) {
+                LOGGER.warn(PACK_FINDER_MARKER, "An error was thrown when loading the resource pack: {}", this.dstPath);
+            } else {
+                packInfoCallback.accept(packInfo);
             }
         }
 
@@ -214,7 +225,7 @@ public final class ResourceSync {
                     Path tempDst = Files.createTempFile("synced-pack-", ".zip");
                     response.getEntity().writeTo(Files.newOutputStream(tempDst));
                     Files.move(tempDst, this.dstPath, StandardCopyOption.REPLACE_EXISTING);
-                    LOGGER.info(DOWNLOAD_MARKER, "Downloaded resource pack from: {}", request.getURI());
+                    LOGGER.info(DOWNLOAD_MARKER, "Downloaded resource pack from (or found in cache): {}", request.getURI());
                 } catch (IOException readError) {
                     LOGGER.warn(DOWNLOAD_MARKER, "Error occurred while downloading the resource pack from remote server. Download cannot continue.", readError);
                     throw new CompletionException(readError);
