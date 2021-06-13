@@ -27,6 +27,7 @@ import net.minecraft.resources.IPackFinder;
 import net.minecraft.resources.IPackNameDecorator;
 import net.minecraft.resources.ResourcePackInfo;
 import net.minecraft.util.LazyValue;
+import net.minecraft.util.Util;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.fml.DistExecutor;
@@ -124,8 +125,15 @@ public final class ResourceSync {
             }
         }
 
+        public static void relaunchIfNeeded() {
+            if (downloadTask.isCancelled()) {
+                downloadTask = CompletableFuture.runAsync(new DownloadTask(storage.get(), dstPath.get()));
+            }
+        }
+
         public static void waitDownloadTask() {
             downloadTask.join();
+            downloadTask = Util.make(new CompletableFuture<>(), c -> c.cancel(true));
         }
     }
 
@@ -142,6 +150,7 @@ public final class ResourceSync {
         @Override
         public void loadPacks(Consumer<ResourcePackInfo> packInfoCallback, ResourcePackInfo.IFactory packInfoFactory) {
             try {
+                Setup.relaunchIfNeeded();
                 Setup.waitDownloadTask();
                 packInfoCallback.accept(ResourcePackInfo.create(
                         "resource_sync", true, () -> new ResourcePack(this.dstPath),
