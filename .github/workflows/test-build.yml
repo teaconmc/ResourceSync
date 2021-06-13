@@ -1,9 +1,5 @@
 name: test-build
-on:
-  push:
-    paths:
-      - "src/**"
-      - "build.gradle"
+on: [push]
 jobs:
   build:
     runs-on: ubuntu-18.04
@@ -18,4 +14,4 @@ jobs:
             !**/.gradle/libs
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
       - name: Build
-        run: gradle build --stacktrace
+        run: ./gradlew build --stacktrace
