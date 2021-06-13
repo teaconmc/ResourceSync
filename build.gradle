@@ -1,18 +1,21 @@
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocation
 
 buildscript {
     repositories {
         maven { url = 'https://files.minecraftforge.net/maven' }
-        mavenCentral()
+        gradlePluginPortal()
     }
     dependencies {
+        classpath group: 'com.github.jengelman.gradle.plugins', name: 'shadow', version: '6.1.0'
         classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '4.1.+', changing: true
     }
 }
 apply plugin: 'net.minecraftforge.gradle'
 // Only edit below this line, the above code adds and enables the necessary things for Forge to be setup.
+apply plugin: 'com.github.johnrengelman.shadow'
 apply plugin: 'eclipse'
 apply plugin: 'maven-publish'
 
@@ -58,18 +61,37 @@ minecraft {
     }
 }
 
+configurations {
+    compileClasspath.extendsFrom(shadow)
+    runtimeClasspath.extendsFrom(shadow)
+}
+
 dependencies {
     minecraft 'net.minecraftforge:forge:1.16.5-36.0.48'
+    shadow 'org.apache.httpcomponents:httpclient-cache:4.3.3'
+}
+
+shadowJar {
+    archiveClassifier.set(null)
+    configurations = [project.configurations.shadow]
+    dependencies {
+        exclude it.dependency('org.apache.httpcomponents:httpclient:.*')
+        exclude it.dependency('org.apache.httpcomponents:httpcore:.*')
+        exclude it.dependency('commons-logging:commons-logging:.*')
+        exclude it.dependency('commons-codec:commons-codec:.*')
+    }
+    relocate 'org.apache', 'org.teacon.sync.repackage.org.apache'
 }
 
 jar {
+    archiveClassifier.set('pure')
     manifest {
         attributes([
             "Specification-Title": "ResourceSync",
             "Specification-Vendor": "3TUSK",
             "Specification-Version": "0.1",
             "Implementation-Title": project.name,
-            "Implementation-Version": "${version}",
+            "Implementation-Version": "${project.version}",
             "Implementation-Vendor": "TeaConMC",
             "Implementation-Timestamp": DateTimeFormatter.ISO_INSTANT.format(Instant.now().truncatedTo(ChronoUnit.SECONDS))
         ])
@@ -78,7 +100,9 @@ jar {
 
 // Example configuration to allow publishing using the maven-publish task
 // This is the preferred method to reobfuscate your jar file
-jar.finalizedBy('reobfJar') 
+shadowJar.finalizedBy('reobfJar')
+// make build task depend on shadowJar
+assemble.dependsOn('shadowJar')
 // However if you are in a multi-project build, dev time needs unobfed jar files, so you can delay the obfuscation until publishing by doing
 publish.dependsOn('reobfJar')
 
@@ -88,7 +112,7 @@ publishing {
             groupId = "org.teacon"
             artifactId = "ResourceSync-Forge-1.16"
 
-            artifact jar
+            artifact shadowJar
             pom {
                 name = 'ResourceStnc for Minecraft 1.16'
                 description = 'Minecraft mod that preemptively keeps resource pack updated'
