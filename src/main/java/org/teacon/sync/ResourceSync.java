@@ -20,6 +20,8 @@
 
 package org.teacon.sync;
 
+import com.electronwill.nightconfig.core.file.CommentedFileConfig;
+import com.electronwill.nightconfig.core.io.WritingMode;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.FilePack;
@@ -34,8 +36,7 @@ import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.fml.ExtensionPoint;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.config.ModConfig;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.minecraftforge.fml.loading.FMLPaths;
 import net.minecraftforge.fml.network.FMLNetworkConstants;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.Header;
@@ -87,6 +88,8 @@ public final class ResourceSync {
 
     static final class Setup {
 
+        private static final Marker SETUP_MARKER = MarkerManager.getMarker("Setup");
+
         private static final LazyValue<HttpCacheStorage> storage = new LazyValue<>(() -> {
             try {
                 Path dir = Minecraft.getInstance().gameDirectory.toPath().resolve("resource-sync");
@@ -106,34 +109,40 @@ public final class ResourceSync {
             }
         });
 
-        private static CompletableFuture<Void> downloadTask = CompletableFuture.completedFuture(null);
+        private static CompletableFuture<Void> downloadTask;
+
+        private static void forceLoad(ForgeConfigSpec configSpec, Path configPath) {
+            CommentedFileConfig configData = CommentedFileConfig.builder(configPath)
+                    .sync().preserveInsertionOrder().autosave().writingMode(WritingMode.REPLACE).build();
+
+            LOGGER.debug(SETUP_MARKER, "Built TOML config for {}", configPath);
+            configData.load();
+
+            LOGGER.debug(SETUP_MARKER, "Loaded TOML config file {}", configPath);
+            configSpec.setConfig(configData);
+            configSpec.save();
+        }
 
         public static void setup() {
             ForgeConfigSpec.Builder configSpecBuilder = new ForgeConfigSpec.Builder();
 
+            String def = "http://example.invalid";
             String comment = " URL pointing to resource pack";
-            packURL = configSpecBuilder.comment(comment).define("packURL", "http://example.invalid");
-            ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, configSpecBuilder.build());
+            packURL = configSpecBuilder.comment(comment).define("packURL", def);
+            forceLoad(configSpecBuilder.build(), FMLPaths.CONFIGDIR.get().resolve("resource-sync-client.toml"));
 
-            FMLJavaModLoadingContext.get().getModEventBus().addListener(Setup::setupConfig);
+            downloadTask = CompletableFuture.runAsync(new DownloadTask(storage.get(), dstPath.get()));
             Minecraft.getInstance().getResourcePackRepository().addPackFinder(new SyncedPackFinder(dstPath.get()));
         }
 
-        private static void setupConfig(ModConfig.Loading event) {
-            if (event.getConfig().getType() == ModConfig.Type.CLIENT) {
-                downloadTask = CompletableFuture.runAsync(new DownloadTask(storage.get(), dstPath.get()));
-            }
-        }
-
-        public static void relaunchIfNeeded() {
+        public static void waitDownloadTask() {
             if (downloadTask.isCancelled()) {
                 downloadTask = CompletableFuture.runAsync(new DownloadTask(storage.get(), dstPath.get()));
+                downloadTask.join();
+            } else {
+                downloadTask.join();
+                downloadTask = Util.make(new CompletableFuture<>(), c -> c.cancel(true));
             }
-        }
-
-        public static void waitDownloadTask() {
-            downloadTask.join();
-            downloadTask = Util.make(new CompletableFuture<>(), c -> c.cancel(true));
         }
     }
 
@@ -150,7 +159,6 @@ public final class ResourceSync {
         @Override
         public void loadPacks(Consumer<ResourcePackInfo> packInfoCallback, ResourcePackInfo.IFactory packInfoFactory) {
             try {
-                Setup.relaunchIfNeeded();
                 Setup.waitDownloadTask();
                 packInfoCallback.accept(ResourcePackInfo.create(
                         "resource_sync", true, () -> new ResourcePack(this.dstPath),
