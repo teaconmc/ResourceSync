@@ -1,8 +1,5 @@
 name: test-build
-on:
-  push:
-    tags-ignore:
-      - **
+on: [push]
 jobs:
   build:
     runs-on: ubuntu-18.04
