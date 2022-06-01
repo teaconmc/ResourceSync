@@ -1,72 +1,57 @@
-import java.time.Instant
-import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
-
 buildscript {
     repositories {
-        maven { url = 'https://files.minecraftforge.net/maven' }
+        maven { url = 'https://maven.minecraftforge.net' }
         maven { url = 'https://maven.parchmentmc.org' }
-        gradlePluginPortal()
         mavenCentral()
     }
     dependencies {
         classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '5.1.+', changing: true
-        classpath group: 'gradle.plugin.com.github.jengelman.gradle.plugins', name: 'shadow', version: '7.+'
         classpath group: 'org.parchmentmc', name: 'librarian', version: '1.+'
     }
 }
 
-apply plugin: 'net.minecraftforge.gradle'
-apply plugin: 'com.github.johnrengelman.shadow'
-apply plugin: 'org.parchmentmc.librarian.forgegradle'
+plugins {
+    id 'com.github.johnrengelman.shadow' version '7.1.2'
+}
 
 apply plugin: 'eclipse'
 apply plugin: 'maven-publish'
+apply plugin: 'net.minecraftforge.gradle'
+apply plugin: 'org.parchmentmc.librarian.forgegradle'
 
-version = '0.2.0'
-group = 'org.teacon'
-archivesBaseName = 'ResourceSync-Forge-1.18'
+apply from: 'gradle/teacon-forge.gradle'
 
-// Mojang ships Java 8 to end users, so we target Java 8 at minimum.
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
-minecraft {
-    // mappings channel: 'official', version: '1.18.1'
-    mappings channel: 'parchment', version: '2021.12.19-1.18.1'
+// definitions at gradle/teacon-forge.gradle
+teacon {
+    modId = 'resource_sync'
+    modVersion = '0.2.0'
+    modLicense = 'LGPL-2.1-or-later'
+    modGitHubRepo = 'teaconmc/ResourceSync'
+    modAuthors = ['3TUSK']
+    modDescription = 'Preemptively keeps resource pack updated.'
 
-    runs {
-        client {
-            workingDirectory project.file('run_client')
-            property 'forge.logging.console.level', 'info'
-            mods {
-                resource_sync {
-                    source sourceSets.main
-                }
-            }
-            lazyToken('minecraft_classpath') {
-                project.configurations.shadow.asPath
-            }
-        }
+    platform = 'forge-1.18.2-40.1.0'
+    parchment = '2022.05.02'
 
-        server {
-            workingDirectory project.file('run')
-            property 'forge.logging.console.level', 'debug'
-            mods {
-                resource_sync {
-                    source sourceSets.main
-                }
-            }
-            lazyToken('minecraft_classpath') {
-                project.configurations.shadow.asPath
-            }
-        }
+    // uncomment these lines if you need
+    modName = 'ResourceSync' // default to repo name
+    // modGitHubBranch = 1.18-forge // for referring the license
+    // modifyMemberAccess = true // for access transformer
+    // useDataGeneration = true // for data generation
+    publishTask = shadowJar // for shadow jar or other usages
+    lazyTokens = ['minecraft_classpath': { project.configurations.shadow.asPath }] // for runtime tokens
 
-        // There are no data to generate for this mod.
-    }
+    // use './gradlew -q printModMeta > src/main/resources/META-INF/mods.toml' to generate mod meta
+}
+
+configurations {
+    compileClasspath.extendsFrom(shadow)
+    runtimeClasspath.extendsFrom(shadow)
 }
 
 dependencies {
-    minecraft 'net.minecraftforge:forge:1.18.1-39.0.9'
     shadow 'org.apache.httpcomponents:httpclient-cache:4.5.13'
 }
 
@@ -83,97 +68,8 @@ shadowJar {
     relocate 'org.apache.http.impl.client.cache', 'org.teacon.sync.repackage.org.apache.http.impl.client.cache'
 }
 
-jar {
-    archiveClassifier.set('pure')
-    manifest {
-        attributes([
-            "Specification-Title": "ResourceSync",
-            "Specification-Vendor": "3TUSK",
-            "Specification-Version": "0.1",
-            "Implementation-Title": project.name,
-            "Implementation-Version": "${project.version}",
-            "Implementation-Vendor": "TeaConMC",
-            "Implementation-Timestamp": DateTimeFormatter.ISO_INSTANT.format(Instant.now().truncatedTo(ChronoUnit.SECONDS))
-        ])
-    }
-}
+jar { it.enabled false }
 
 reobf {
-    shadowJar {} // Re-obfuscate the shadowed JAR
-}
-
-artifacts {
-    archives shadowJar
-}
-
-jar.finalizedBy('reobfJar')
-shadowJar.finalizedBy('reobfShadowJar')
-
-publish.dependsOn('reobfJar')
-publish.dependsOn('reobfShadowJar')
-
-publishing {
-    publications {
-        release(MavenPublication) {
-            groupId = "org.teacon"
-            artifactId = "ResourceSync-Forge-1.18"
-
-            artifact shadowJar
-            pom {
-                name = 'ResourceStnc for Minecraft 1.18'
-                description = 'Minecraft mod that preemptively keeps resource pack updated'
-                url = 'https://github.com/teaconmc/ResourceSync'
-                licenses {
-                    license {
-                        name = 'BSD-3-Clause'
-                        url = 'https://github.com/teaconmc/ResourceSync/blob/1.18-forge/COPYING.LGPL'
-                    }
-                }
-                developers {
-                    developer {
-                        id = '3TUSK'
-                        name = '3TUSK'
-                    }
-                }
-                issueManagement {
-                    system = 'GitHub Issues'
-                    url = 'https://github.com/teaconmc/ResourceSync/issues'
-                }
-                scm {
-                    url = 'https://github.com/teaconmc/ResourceSync'
-                    connection = 'scm:git:git://github.com/teaconmc/ResourceSync.git'
-                    developerConnection = 'scm:git:git@github.com:teaconmc/ResourceSync.git'
-                }
-            }
-        }
-    }
-    repositories {
-        maven {
-            name = "teacon"
-            url = "s3://maven/"
-            credentials(AwsCredentials) {
-                accessKey = System.env.ARCHIVE_ACCESS_KEY
-                secretKey = System.env.ARCHIVE_SECRET_KEY
-            }
-        }
-    }
-}
-
-tasks.withType(PublishToMavenRepository) {
-    onlyIf {
-        System.env.ARCHIVE_ACCESS_KEY && System.env.ARCHIVE_SECRET_KEY
-    }
-}
-
-/**
- * A simple task to pass down the artifact name and path to other GitHub actions.
- */
-task("githubActionOutput") {
-    onlyIf {
-        System.env.GITHUB_ACTIONS
-    }
-    doLast {
-        println "::set-output name=artifact_path::${shadowJar.archiveFile.get().asFile.absolutePath}"
-        println "::set-output name=artifact_name::${shadowJar.archiveFileName.get()}"
-    }
+    jar { it.enabled false }
 }

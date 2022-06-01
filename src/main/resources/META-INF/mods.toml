@@ -6,7 +6,7 @@ issueTrackerURL="https://github.com/teaconmc/ResourceSync"
 [[mods]]
 modId="resource_sync"
 version="${file.jarVersion}"
-displayName="ResourceSync"
+displayName="Resource Sync"
 credits="OpenLoader by Darkhax, for IPackFinder implementation"
 authors="3TUSK"
 description="Preemptively keeps resource pack updated"
