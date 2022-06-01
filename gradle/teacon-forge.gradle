@@ -163,7 +163,7 @@ gradle.afterProject { Project current ->
     // configure jar and re-obf
     publishJarTask.configure { Jar it ->
         it.archiveBaseName.set(jarArchiveBaseName)
-        it.archiveVersion.set("${artifactVersion}${identifier ? '' : '-' + identifier}")
+        it.archiveVersion.set("${artifactVersion}${identifier ? '-' + identifier : ''}")
         it.manifest.attributes(generateArtifactAttributes(repoName, '1', it.archiveVersion.get()) as Map<String, ?>)
     }
 
