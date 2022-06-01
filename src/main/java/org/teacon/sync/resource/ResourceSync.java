@@ -18,7 +18,7 @@
 
 // SPDX-Identifier: LGPL-2.1-or-later
 
-package org.teacon.sync;
+package org.teacon.sync.resource;
 
 import com.electronwill.nightconfig.core.file.CommentedFileConfig;
 import com.electronwill.nightconfig.core.io.WritingMode;
