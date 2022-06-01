@@ -26,7 +26,7 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 // definitions at gradle/teacon-forge.gradle
 teacon {
     modId = 'resource_sync'
-    modVersion = '0.2.0'
+    modVersion = '0.2.1'
     modLicense = 'LGPL-2.1-or-later'
     modGitHubRepo = 'teaconmc/ResourceSync'
     modAuthors = ['3TUSK']
